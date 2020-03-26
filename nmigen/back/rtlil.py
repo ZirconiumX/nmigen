@@ -11,6 +11,17 @@ __all__ = ["convert", "convert_fragment"]
 
 
 class _Namer:
+    _escape_map = str.maketrans({
+        "\"": "\\\"",
+        "\\": "\\\\",
+        "\t": "\\t",
+        "\r": "\\r",
+        "\n": "\\n",
+        ":": "_L",
+        "-": "_",
+        ".": "_"
+    })
+
     def __init__(self):
         super().__init__()
         self._anon  = 0
@@ -23,10 +34,13 @@ class _Namer:
         self._anon += 1
         return name
 
-    def _make_name(self, name, local):
+    def _make_name(self, name, local, src=None):
         if name is None:
-            self._index += 1
-            name = "${}".format(self._index)
+            if src is not None and src != "":
+                name = "\\{}".format(src.translate(self._escape_map))
+            else:
+                self._index += 1
+                name = "${}".format(self._index)
         elif not local and name[0] not in "\\$":
             name = "\\{}".format(name)
         while name in self._names:
@@ -102,7 +116,7 @@ class _ModuleBuilder(_Namer, _BufferedBuilder, _AttrBuilder):
 
     def wire(self, width, port_id=None, port_kind=None, name=None, attrs={}, src=""):
         self._attributes(attrs, src=src, indent=1)
-        name = self._make_name(name, local=False)
+        name = self._make_name(name, local=False, src=src)
         if port_id is None:
             self._append("  wire width {} {}\n", width, name)
         else:
@@ -115,13 +129,13 @@ class _ModuleBuilder(_Namer, _BufferedBuilder, _AttrBuilder):
 
     def memory(self, width, size, name=None, attrs={}, src=""):
         self._attributes(attrs, src=src, indent=1)
-        name = self._make_name(name, local=False)
+        name = self._make_name(name, local=False, src=src)
         self._append("  memory width {} size {} {}\n", width, size, name)
         return name
 
     def cell(self, kind, name=None, params={}, ports={}, attrs={}, src=""):
         self._attributes(attrs, src=src, indent=1)
-        name = self._make_name(name, local=False)
+        name = self._make_name(name, local=False, src=src)
         self._append("  cell {} {}\n", kind, name)
         for param, value in params.items():
             if isinstance(value, str):
@@ -144,7 +158,7 @@ class _ModuleBuilder(_Namer, _BufferedBuilder, _AttrBuilder):
         return name
 
     def process(self, name=None, attrs={}, src=""):
-        name = self._make_name(name, local=True)
+        name = self._make_name(name, local=True, src=src)
         return _ProcessBuilder(self, name, attrs, src)
 
 
